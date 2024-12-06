@@ -1,0 +1,359 @@
+
+
+#work
+from flask import Flask, request, jsonify, redirect, url_for, render_template
+from dotenv import load_dotenv
+import os
+import requests
+import threading
+import time
+import cache
+import json
+import openai
+# Load environment variables
+load_dotenv()
+
+client_id = os.getenv('clientid')
+client_secret = os.getenv('clientSec')
+redirect_uri = 'http://localhost:8888/callback'
+openai.api_key = os.getenv('OPENAI_API_KEY')  # Ensure this is set in your .env file
+
+
+# Flask app setup
+app = Flask(__name__)
+auth_code = None
+access_token = None
+
+
+def get_auth_url():
+    scope = 'user-top-read user-read-recently-played user-read-playback-state'
+    return f"https://accounts.spotify.com/authorize?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&scope={scope}"
+
+@app.route('/')
+def home():
+    return render_template('index.html')  # Home page with login button
+
+@app.route('/login')
+def login():
+    auth_url = get_auth_url()
+    return redirect(auth_url)
+
+@app.route('/callback')
+def callback():
+    global auth_code
+    auth_code = request.args.get('code')
+    if auth_code:
+        get_access_token()  # Fetch access token after receiving code
+        return redirect(url_for('dashboard'))
+    return "Authorization failed. Please try again."
+
+def get_access_token():
+    global access_token, token_expiry_time
+    token_url = 'https://accounts.spotify.com/api/token'
+    data = {
+        'grant_type': 'authorization_code',
+        'code': auth_code,
+        'redirect_uri': redirect_uri,
+        'client_id': client_id,
+        'client_secret': client_secret
+    }
+    response = requests.post(token_url, data=data)
+    token_info = response.json()
+    access_token = token_info.get('access_token')
+    expires_in = token_info.get('expires_in', 0)
+    token_expiry_time = time.time() + expires_in
+
+def is_token_valid():
+    return access_token is not None and time.time() < token_expiry_time
+@app.route('/logout', methods=['POST'])
+def logout():
+    global access_token, auth_code
+    # Clear the session variables
+    access_token = None
+    auth_code = None
+    # Redirect to the home page
+    return jsonify({"message": "Logged out successfully"}), 200
+
+@app.route('/dashboard')
+def dashboard():
+    if not is_token_valid():
+        return redirect(url_for('login'))
+
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.get('https://api.spotify.com/v1/me/top/tracks?limit=10', headers=headers)
+
+    genre_counts = {}
+    if response.status_code == 200:
+        for track_item in response.json().get('items', []):
+            artist_id = track_item['artists'][0]['id']
+            artist_info = get_artist_info(artist_id)
+            genres = artist_info.get('genres', [])
+            for genre in genres:
+                genre_counts[genre] = genre_counts.get(genre, 0) + 1
+
+    sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_10_genres = [genre for genre, _ in sorted_genres]
+    top_10_counts = [10] * len(top_10_genres)
+
+    # Fetch the user's profile
+    user_profile = get_user_profile()
+    username = user_profile.get('display_name', 'Guest')  # Fallback to "Guest"
+
+    top_tracks()
+    top_artists()
+    playlists()
+    listening_history()  # Add this to fetch and cache listening history
+
+    with open('cache.json', 'r') as f:
+        cache_data = json.load(f)
+
+    return render_template(
+        'dashboard.html',
+        genres=top_10_genres,
+        genre_counts=top_10_counts,
+        cache_data=cache_data,
+        username=username
+    )
+
+
+  
+
+
+@app.route('/analyze_personality', methods=['GET'])
+def analyze_personality():
+    # Load cached data
+    cached_data = cache.load_cached_analysis()
+    cached_analysis = cached_data.get('personality_analysis')
+
+    # Return cached analysis if it exists
+    if cached_analysis:
+        return jsonify({"personality_analysis": cached_analysis})
+
+    # Generate new analysis
+    with open('cache.json', 'r') as f:
+        cache_data = json.load(f)
+
+    genres = cache_data.get('top_genres', [])
+    top_tracks = [track.get('name') for track in cache_data.get('top_tracks', [])]
+    top_artists = [artist.get('name') for artist in cache_data.get('top_artists', [])]
+
+    # Fetch the user's profile for username
+    user_profile = get_user_profile()
+    username = user_profile.get('display_name', 'Guest')
+    messages = [
+    {
+        "role": "system",
+        "content": """
+        You are a close friend of the user, full of warmth and personality. Write in a casual, friendly tone, like you're chatting at a coffee shop. Forget about being formal or perfect—just share your thoughts naturally, with a sprinkle of humor and real emotion. Don't sound robotic; keep it fun and lighthearted!
+        """
+    },
+    {
+        "role": "user",
+        "content": f"""
+        Hey {username}! Okay, so here's the deal—I peeked at your music preferences, and wow, your playlist is something else! It's giving me *major vibes* about who you are as a person. Here's what you’re into:
+        - Genres: {', '.join(genres)}
+        - Top Songs: {', '.join(top_tracks)}
+        - Top Artists: {', '.join(top_artists)}
+        *****write under 300 word********!!
+
+        Based on this, tell me who you think I am! Make it fun, like you're hyped to talk about me. Imagine we're just friends joking around, and you're describing me to someone else.
+        """
+    }
+]
+
+
+ 
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-4-turbo",
+            messages=messages,
+            max_tokens=400,
+            temperature=0.7
+        )
+        analysis = response.choices[0].message['content'].strip()
+
+        # Save analysis to cache
+        cached_data['personality_analysis'] = analysis
+        cache.save_cached_analysis(cached_data)
+
+        return jsonify({"personality_analysis": analysis})
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return jsonify({"error": "Failed to analyze personality"}), 500
+
+@app.route('/top_artists')
+def top_artists():
+    # Check if the data is already cached
+    cached_artists = cache.get_cached_data("top_artists")
+    if cached_artists:
+        return jsonify(cached_artists)  # Return cached data
+
+    # Fetch from Spotify API if not cached
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.get('https://api.spotify.com/v1/me/top/artists?limit=12', headers=headers)
+
+    artist_data = []
+    if response.status_code == 200:
+        for artist_item in response.json().get('items', []):
+            artist_data.append({
+                'name': artist_item['name'],
+                'genres': ', '.join(artist_item.get('genres', [])),
+                'popularity': artist_item.get('popularity', 'N/A'),
+                'url': artist_item['external_urls']['spotify']  # Add Spotify profile link
+            })
+
+        # Cache the data
+        cache.cache_data("top_artists", artist_data)
+        return jsonify(artist_data)
+
+    return jsonify({"error": "Failed to get top artists"})
+
+def get_artist_info(artist_id):
+    """Fetch artist details, including genres, for a given artist ID."""
+    artist_url = f'https://api.spotify.com/v1/artists/{artist_id}'
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+    response = requests.get(artist_url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to get artist info for artist ID {artist_id}. Status code: {response.status_code}")
+        return {}    
+
+
+@app.route('/listening_history')
+def listening_history():
+    # Check server-side cache
+    cached_history = cache.get_cached_data("listening_history")
+    if cached_history:
+        return jsonify(cached_history)  # Return cached data
+
+    # Fetch from Spotify API
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.get('https://api.spotify.com/v1/me/player/recently-played?limit=15', headers=headers)
+
+    if response.status_code == 200:
+        history_data = []
+        for item in response.json().get('items', []):
+            track = item['track']
+            history_data.append({
+                'name': track['name'],
+                'artist': ', '.join(artist['name'] for artist in track['artists']),
+                'album': track['album']['name'],
+                'played_at': item['played_at'],
+                'url': track['external_urls']['spotify']  # Add Spotify track link
+            })
+
+        # Cache the data
+        cache.cache_data("listening_history", history_data)
+        return jsonify(history_data)
+
+    return jsonify({"error": "Failed to get listening history"})
+
+def get_track_features(track_id):
+
+    features_url = f'https://api.spotify.com/v1/audio-features/{track_id}'
+    headers = {
+        'Authorization': f'Bearer {access_token}'
+    }
+    response = requests.get(features_url, headers=headers)
+    
+    if response.status_code == 200:
+        features = response.json()
+        return {
+            'danceability': features['danceability'],
+            'energy': features['energy'],
+            'key': features['key'],
+            'loudness': features['loudness'],
+            'tempo': features['tempo'],
+            'valence': features['valence'],
+            'popularity': features.get('popularity', 'N/A')  # popularity might not be available in this API
+        }
+    else:
+        print(f"Failed to get features for track {track_id}. Status code: {response.status_code}")
+        return {}
+
+def get_user_profile():
+    """Fetch the current user's profile information."""
+    profile_url = 'https://api.spotify.com/v1/me'
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.get(profile_url, headers=headers)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to get user profile. Status code: {response.status_code}")
+        return {}
+
+
+@app.route('/top_tracks')
+def top_tracks():
+    # Check server-side cache
+    cached_tracks = cache.get_cached_data("top_tracks")
+    if cached_tracks:
+        print("Server cache hit for top_tracks")
+        return jsonify(cached_tracks)  # Return cached data
+
+    print("Server cache miss for top_tracks")
+    # Fetch from API
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.get('https://api.spotify.com/v1/me/top/tracks?limit=12', headers=headers)
+
+    if response.status_code == 200:
+        track_info = []
+        for track_item in response.json().get('items', []):
+            track_id = track_item['id']
+            features = get_track_features(track_id)
+            artist_id = track_item['artists'][0]['id']
+            artist_info = get_artist_info(artist_id)
+            genres = ', '.join(artist_info.get('genres', [])) if artist_info else 'Unknown'
+            track_info.append({
+                'name': track_item['name'],
+                'artist': ', '.join(artist['name'] for artist in track_item['artists']),
+                'genres': genres,
+                'url': track_item['external_urls']['spotify'],  # Add Spotify link
+                'danceability': features.get('danceability'),
+                'energy': features.get('energy'),
+                'tempo': features.get('tempo'),
+                'popularity': track_item.get('popularity', 'N/A')
+            })
+
+        # Cache the data
+        cache.cache_data("top_tracks", track_info)
+        return jsonify(track_info)
+
+    return jsonify({"error": "Failed to get top tracks"})
+
+@app.route('/playlists')
+def playlists():
+    # Check if the data is already cached
+    cached_playlists = cache.get_cached_data("playlists")
+    if cached_playlists:
+        return jsonify(cached_playlists)  # Return cached data
+
+    # Fetch from Spotify API
+    headers = {'Authorization': f'Bearer {access_token}'}
+    response = requests.get('https://api.spotify.com/v1/me/playlists', headers=headers)
+
+    if response.status_code == 200:
+        playlist_data = []
+        for playlist in response.json().get('items', []):
+            playlist_data.append({
+                'name': playlist['name'],
+                'url': playlist['external_urls']['spotify'],  # Add Spotify playlist link
+                'tracks': playlist['tracks']['total']  # Total number of tracks (optional)
+            })
+
+        # Cache the data
+        cache.cache_data("playlists", playlist_data)
+        return jsonify(playlist_data)
+
+    return jsonify({"error": "Failed to get playlists"})
+
+# if __name__ == '__main__':
+#     app.run(port=8888)
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)

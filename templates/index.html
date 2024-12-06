@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Login</title>
+    <style>
+/* General Reset */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Roboto', sans-serif;
+    background-color: #f4f6f9;
+    overflow-x: hidden;
+}
+
+/* Background Decor */
+.background-decor {
+    position: absolute;
+    width: 150px;
+    height: 150px;
+    background: linear-gradient(45deg, #008080, #00cccc);
+    border-radius: 50%;
+    opacity: 0.5;
+    animation: float 6s infinite ease-in-out;
+}
+
+/* Position background decor */
+.background-decor:nth-child(1) {
+    top: -50px;
+    left: -50px;
+    animation-delay: 0s;
+}
+.background-decor:nth-child(2) {
+    bottom: -50px;
+    right: -50px;
+    animation-delay: 2s;
+}
+
+/* Floating animation */
+@keyframes float {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-20px);
+    }
+}
+
+/* Container */
+.container {
+    position: relative;
+    max-width: 700px;
+    margin: 100px auto;
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    animation: fadeIn 1.5s ease-in-out;
+}
+
+/* Heading */
+.container h1 {
+    font-size: 36px;
+    color: #004c4c;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+/* Paragraph */
+.container p {
+    font-size: 16px;
+    color: #555555;
+    line-height: 1.6;
+    margin-bottom: 30px;
+}
+
+/* Button */
+.button-container a {
+    text-decoration: none;
+}
+
+.button-container button {
+    background-color: #008080;
+    color: #ffffff;
+    padding: 15px 30px;
+    border: none;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease-in-out;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.button-container button:hover {
+    background-color: #005b5b;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Fade-in animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+    </style>
+</head>
+<body>
+    <div class="background-decor"></div>
+    <div class="background-decor"></div>
+    <div class="container">
+        <h1>Welcome to Spotify Dashboard</h1>
+        <p>
+            Welcome back to your Spotify Dashboard. Explore your favorite tracks, artists, and playlists—or take it to the next level by discovering <strong>what your music says about YOU with our AI personality analyzer!</strong>
+        </p>
+        <div class="button-container">
+            <a href="{{ url_for('login') }}">
+                <button>Login with Spotify</button>
+            </a>
+        </div>
+    </div>
+    
+</body>
+</html>
