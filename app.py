@@ -5,7 +5,6 @@ from flask import Flask, request, jsonify, redirect, url_for, render_template
 from dotenv import load_dotenv
 import os
 import requests
-import threading
 import time
 import cache
 import json
@@ -15,7 +14,7 @@ load_dotenv()
 
 client_id = os.getenv('clientid')
 client_secret = os.getenv('clientSec')
-redirect_uri = 'http://localhost:8888/callback'
+redirect_uri = ''
 openai.api_key = os.getenv('OPENAI_API_KEY')  # Ensure this is set in your .env file
 
 
