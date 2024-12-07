@@ -3,6 +3,8 @@
 #work
 from flask import Flask, request, jsonify, redirect, url_for, render_template
 from dotenv import load_dotenv
+from cache import get_cached_data, cache_data, clear_cache, clear_user_cache
+
 import os
 import requests
 import time
@@ -308,7 +310,7 @@ def top_tracks():
     if not user_id:
         return jsonify({"error": "Failed to identify user"}), 400
 
-    # Check user-specific cache
+    # Retrieve cached data for this user
     cached_tracks = get_cached_data(user_id, "top_tracks")
     if cached_tracks:
         print(f"Cache hit for user {user_id}")
