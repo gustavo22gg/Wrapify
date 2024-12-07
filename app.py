@@ -250,32 +250,30 @@ def get_artist_info(artist_id):
 
 @app.route('/listening_history')
 def listening_history():
-    # Check server-side cache
-    cached_history = cache.get_cached_data("listening_history")
-    if cached_history:
-        return jsonify(cached_history)  # Return cached data
+    user_id = get_user_profile().get('id')
+    if not user_id:
+        return jsonify({"error": "Failed to identify user"}), 400
 
-    # Fetch from Spotify API
+    cached_history = get_cached_data(user_id, "listening_history")
+    if cached_history:
+        return jsonify(cached_history)
+
     headers = {'Authorization': f'Bearer {access_token}'}
     response = requests.get('https://api.spotify.com/v1/me/player/recently-played?limit=15', headers=headers)
 
     if response.status_code == 200:
-        history_data = []
-        for item in response.json().get('items', []):
-            track = item['track']
-            history_data.append({
-                'name': track['name'],
-                'artist': ', '.join(artist['name'] for artist in track['artists']),
-                'album': track['album']['name'],
+        history_data = [
+            {
+                'name': item['track']['name'],
+                'artist': ', '.join(artist['name'] for artist in item['track']['artists']),
+                'album': item['track']['album']['name'],
                 'played_at': item['played_at'],
-                'url': track['external_urls']['spotify']  # Add Spotify track link
-            })
-
-        # Cache the data
-        cache.cache_data("listening_history", history_data)
+                'url': item['track']['external_urls']['spotify']
+            }
+            for item in response.json().get('items', [])
+        ]
+        cache_data(user_id, "listening_history", history_data)
         return jsonify(history_data)
-
-    return jsonify({"error": "Failed to get listening history"})
 
 def get_track_features(track_id):
 
