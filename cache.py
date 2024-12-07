@@ -56,6 +56,13 @@ def cache_data(user_id, key, data, ttl=3600):
     }
     _save_cache(cache)
 
+def clear_user_cache(user_id):
+    cache = _load_cache()
+    user_keys = [key for key in cache.keys() if key.startswith(f"{user_id}_")]
+    for key in user_keys:
+        del cache[key]
+    _save_cache(cache)
+    print(f"Cache cleared for user {user_id}")
 
 
 def clear_cache():
