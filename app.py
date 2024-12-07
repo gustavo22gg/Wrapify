@@ -42,9 +42,24 @@ def callback():
     global auth_code
     auth_code = request.args.get('code')
     if auth_code:
-        get_access_token()  # Fetch access token after receiving code
+        get_access_token()
+
+        # Clear cache for the user
+        user_id = get_user_profile().get('id')
+        if user_id:
+            clear_user_cache(user_id)
+
         return redirect(url_for('dashboard'))
     return "Authorization failed. Please try again."
+
+def clear_user_cache(user_id):
+    cache = _load_cache()
+    user_keys = [key for key in cache.keys() if key.startswith(f"{user_id}_")]
+    for key in user_keys:
+        del cache[key]
+    _save_cache(cache)
+    print(f"Cache cleared for user {user_id}")
+
 
 def get_access_token():
     global access_token, token_expiry_time
@@ -289,41 +304,36 @@ def get_user_profile():
 
 @app.route('/top_tracks')
 def top_tracks():
-    # Check server-side cache
-    cached_tracks = cache.get_cached_data("top_tracks")
-    if cached_tracks:
-        print("Server cache hit for top_tracks")
-        return jsonify(cached_tracks)  # Return cached data
+    user_id = get_user_profile().get('id')  # Fetch Spotify user ID
+    if not user_id:
+        return jsonify({"error": "Failed to identify user"}), 400
 
-    print("Server cache miss for top_tracks")
-    # Fetch from API
+    # Check user-specific cache
+    cached_tracks = get_cached_data(user_id, "top_tracks")
+    if cached_tracks:
+        print(f"Cache hit for user {user_id}")
+        return jsonify(cached_tracks)
+
+    print(f"Cache miss for user {user_id}")
+    # Fetch fresh data from Spotify
     headers = {'Authorization': f'Bearer {access_token}'}
     response = requests.get('https://api.spotify.com/v1/me/top/tracks?limit=12', headers=headers)
 
     if response.status_code == 200:
         track_info = []
         for track_item in response.json().get('items', []):
-            track_id = track_item['id']
-            features = get_track_features(track_id)
-            artist_id = track_item['artists'][0]['id']
-            artist_info = get_artist_info(artist_id)
-            genres = ', '.join(artist_info.get('genres', [])) if artist_info else 'Unknown'
             track_info.append({
                 'name': track_item['name'],
                 'artist': ', '.join(artist['name'] for artist in track_item['artists']),
-                'genres': genres,
-                'url': track_item['external_urls']['spotify'],  # Add Spotify link
-                'danceability': features.get('danceability'),
-                'energy': features.get('energy'),
-                'tempo': features.get('tempo'),
-                'popularity': track_item.get('popularity', 'N/A')
+                'popularity': track_item.get('popularity', 'N/A'),
+                'url': track_item['external_urls']['spotify']
             })
 
-        # Cache the data
-        cache.cache_data("top_tracks", track_info)
+        # Cache the data for the specific user
+        cache_data(user_id, "top_tracks", track_info)
         return jsonify(track_info)
 
-    return jsonify({"error": "Failed to get top tracks"})
+    return jsonify({"error": "Failed to fetch top tracks"})
 
 @app.route('/playlists')
 def playlists():
