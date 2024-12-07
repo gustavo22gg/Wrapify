@@ -369,7 +369,7 @@ def playlists():
             })
 
         # Cache the data
-        cache.cache_data("playlists", playlist_data)
+        cache.cache_data(user_id, "playlists", playlist_data)
         return jsonify(playlist_data)
 
     return jsonify({"error": "Failed to get playlists"})
