@@ -201,11 +201,19 @@ def analyze_personality():
 
 @app.route('/top_artists')
 def top_artists():
-    # Check if the data is already cached
-    cached_artists = cache.get_cached_data("top_artists")
+    # Fetch the user's Spotify ID
+    user_id = get_user_profile().get('id')  # Ensure user ID is fetched
+
+    if not user_id:
+        return jsonify({"error": "Failed to identify user"}), 400
+
+    # Check if the data is already cached for this user
+    cached_artists = get_cached_data(user_id, "top_artists")
     if cached_artists:
+        print(f"Cache hit for user {user_id} - top artists")
         return jsonify(cached_artists)  # Return cached data
 
+    print(f"Cache miss for user {user_id} - fetching top artists")
     # Fetch from Spotify API if not cached
     headers = {'Authorization': f'Bearer {access_token}'}
     response = requests.get('https://api.spotify.com/v1/me/top/artists?limit=12', headers=headers)
@@ -220,8 +228,8 @@ def top_artists():
                 'url': artist_item['external_urls']['spotify']  # Add Spotify profile link
             })
 
-        # Cache the data
-        cache.cache_data("top_artists", artist_data)
+        # Cache the data for this user
+        cache_data(user_id, "top_artists", artist_data)
         return jsonify(artist_data)
 
     return jsonify({"error": "Failed to get top artists"})
