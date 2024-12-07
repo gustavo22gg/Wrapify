@@ -55,11 +55,11 @@ def callback():
     return "Authorization failed. Please try again."
 
 def clear_user_cache(user_id):
-    cache = cache._load_cache()
-    user_keys = [key for key in cache.keys() if key.startswith(f"{user_id}_")]
+    cache_data = cache._load_cache()  # Avoid using "cache" as a variable
+    user_keys = [key for key in cache_data.keys() if key.startswith(f"{user_id}_")]
     for key in user_keys:
-        del cache[key]
-    cache._save_cache(cache)
+        del cache_data[key]
+    cache._save_cache(cache_data)  # Save updated cache
     print(f"Cache cleared for user {user_id}")
 
 
