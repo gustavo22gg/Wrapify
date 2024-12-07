@@ -467,7 +467,10 @@ window.addEventListener('click', (e) => {
         function renderTopTracks() {
     const container = document.getElementById('topTracks');
     container.innerHTML = ''; // Clear the container
-    cacheData.top_tracks.forEach((track, index) => {
+    const topTracksKey = Object.keys(cacheData).find(key => key.includes('_top_tracks'));
+    const topTracksData = cacheData[topTracksKey]?.data || [];
+
+    topTracksData.forEach((track, index) => {
         const div = document.createElement('div');
         div.className = 'box';
         div.innerHTML = `
@@ -481,17 +484,17 @@ window.addEventListener('click', (e) => {
     });
 }
 
-
         // Render Top Artists
         function renderTopArtists() {
     const container = document.getElementById('topArtists');
     container.innerHTML = ''; // Clear the container
     
-    cacheData.top_artists.forEach(artist => {
+    const topArtistsKey = Object.keys(cacheData).find(key => key.includes('_top_artists'));
+    const topArtistsData = cacheData[topArtistsKey]?.data || [];
+
+    topArtistsData.forEach(artist => {
         const div = document.createElement('div');
         div.className = 'box';
-        
-        // Create clickable artist name linking to Spotify profile
         div.innerHTML = `
             <a href="${artist.url}" target="_blank" style="color: #008080; text-decoration: none; font-weight: bold;">
                 ${artist.name}
@@ -502,16 +505,18 @@ window.addEventListener('click', (e) => {
 }
 
 
+
         // Render Playlists
         function renderPlaylists() {
     const container = document.getElementById('playlists');
     container.innerHTML = ''; // Clear the container
     
-    cacheData.playlists.forEach(playlist => {
+    const playlistsKey = Object.keys(cacheData).find(key => key.includes('_playlists'));
+    const playlistsData = cacheData[playlistsKey]?.data || [];
+
+    playlistsData.forEach(playlist => {
         const div = document.createElement('div');
         div.className = 'box';
-        
-        // Create a clickable link for each playlist
         div.innerHTML = `
             <strong>${playlist.name}</strong>
             <p>Total Tracks: ${playlist.tracks}</p>
@@ -522,7 +527,6 @@ window.addEventListener('click', (e) => {
         container.appendChild(div);
     });
 }
-
 
         function getPersonalityAnalysis() {
         const resultContainer = document.getElementById('personalityResult');
@@ -566,11 +570,12 @@ function renderListeningHistory() {
     const container = document.getElementById('listeningHistory');
     container.innerHTML = ''; // Clear the container
     
-    cacheData.listening_history.forEach(item => {
+    const listeningHistoryKey = Object.keys(cacheData).find(key => key.includes('_listening_history'));
+    const listeningHistoryData = cacheData[listeningHistoryKey]?.data || [];
+
+    listeningHistoryData.forEach(item => {
         const div = document.createElement('div');
         div.className = 'box';
-        
-        // Create a clickable link for each track
         div.innerHTML = `
             <strong>${item.name}</strong> 
             <p>by <em>${item.artist}</em></p>
