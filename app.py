@@ -347,8 +347,11 @@ def top_tracks():
 
 @app.route('/playlists')
 def playlists():
+    user_id = get_user_profile().get('id')
+    if not user_id:
+        return jsonify({"error": "Failed to identify user"}), 400
     # Check if the data is already cached
-    cached_playlists = cache.get_cached_data("playlists")
+    cached_playlists = cache.get_cached_data(user_id, "playlists")
     if cached_playlists:
         return jsonify(cached_playlists)  # Return cached data
 
