@@ -36,7 +36,15 @@ def _save_cache(cache):
 def get_cached_data(user_id, key):
     cache = _load_cache()
     user_specific_key = f"{user_id}_{key}"
-    return cache.get(user_specific_key)
+    cached_entry = cache.get(user_specific_key)
+    if cached_entry:
+        # Check if the cache is expired
+        if time.time() - cached_entry["timestamp"] > cached_entry["ttl"]:
+            print(f"Cache expired for key: {user_specific_key}")
+            return None
+        return cached_entry["data"]
+    return None
+
 
 def cache_data(user_id, key, data):
     cache = _load_cache()
