@@ -14,7 +14,7 @@ load_dotenv()
 
 client_id = os.getenv('clientid')
 client_secret = os.getenv('clientSec')
-redirect_uri = 'https://spotify-dashboard-uds7.onrender.com/callback'
+redirect_uri = 'https://wrapify-ylor.onrender.com/callback'
 openai.api_key = os.getenv('OPENAI_API_KEY')  # Ensure this is set in your .env file
 
 
