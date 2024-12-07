@@ -46,12 +46,16 @@ def get_cached_data(user_id, key):
     return None
 
 
-def cache_data(user_id, key, data):
+def cache_data(user_id, key, data, ttl=3600):
     cache = _load_cache()
     user_specific_key = f"{user_id}_{key}"
-    cache[user_specific_key] = data
-    print(f"Caching data under key: {user_specific_key}")  # Debugging
+    cache[user_specific_key] = {
+        "data": data,
+        "timestamp": time.time(),
+        "ttl": ttl
+    }
     _save_cache(cache)
+
 
 
 def clear_cache():
